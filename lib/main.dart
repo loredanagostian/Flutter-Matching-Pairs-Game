@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:matching_pairs_game/models/card_item.dart';
+import 'package:matching_pairs_game/widgets/flip_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -153,7 +154,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
                 children: List.generate(_cards.length, (index) {
-                  return InkWell(
+                  return FlipCard(
+                    isFlipped: _cards[index].state != CardState.unflipped,
                     onTap: () {
                       if (_isBusy) return;
 
@@ -186,21 +188,34 @@ class _MyHomePageState extends State<MyHomePage> {
                         }
                       });
                     },
-                    child: Card(
+                    front: Card(
                       elevation: 8,
-                      clipBehavior: Clip.antiAlias,
+                      color: Colors.grey,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      color: _cards[index].color,
-                      shadowColor: Colors.transparent,
+                      child: const Center(
+                        child: Text(
+                          '?',
+                          style: TextStyle(fontSize: 28, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                    back: Card(
+                      elevation: 8,
+                      color:
+                          _cards[index].state == CardState.matched
+                              ? Colors.green
+                              : Colors.blue,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       child: Center(
                         child: Text(
-                          _cards[index].displayLabel,
+                          _cards[index].flippedLabel,
                           style: const TextStyle(
-                            fontSize: 20,
+                            fontSize: 28,
                             color: Colors.white,
-                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
