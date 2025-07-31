@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:matching_pairs_game/models/card_item.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -45,10 +46,13 @@ class _MyHomePageState extends State<MyHomePage> {
     CardItem(flippedLabel: '🔵'),
   ]..shuffle();
   CardItem? selectedCard;
+  bool _isBusy = false;
+  int? _bestTime;
 
   @override
   void initState() {
     super.initState();
+    _loadBestTime();
     _startTimer();
   }
 
@@ -56,6 +60,18 @@ class _MyHomePageState extends State<MyHomePage> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadBestTime() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bestTime = prefs.getInt('best_time');
+    if (bestTime == 0) {
+      await prefs.setInt('best_time', -1);
+    }
+
+    setState(() {
+      _bestTime = prefs.getInt('best_time');
+    });
   }
 
   void _startTimer() {
@@ -66,10 +82,25 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  void _checkGameFinished() {
+  void _checkGameFinished() async {
     final allMatched = _cards.every((card) => card.state == CardState.matched);
     if (allMatched) {
       _timer?.cancel();
+
+      final prefs = await SharedPreferences.getInstance();
+      final savedBestTime = prefs.getInt('best_time');
+
+      if (savedBestTime == null ||
+          savedBestTime == -1 ||
+          _time < savedBestTime) {
+        if (_time > 0) {
+          // Save new best time
+          await prefs.setInt('best_time', _time);
+          setState(() {
+            _bestTime = _time;
+          });
+        }
+      }
     }
   }
 
@@ -85,16 +116,31 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Level: Easy',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Level: Easy',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                Visibility(
+                  visible: _bestTime != null && _bestTime! > 0,
+                  child: Text(
+                    'Best time: ${_bestTime ?? "-"} seconds',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             Center(
               child: Text(
                 'Time: $_time seconds',
                 style: const TextStyle(
-                  fontSize: 24,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -109,6 +155,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 children: List.generate(_cards.length, (index) {
                   return InkWell(
                     onTap: () {
+                      if (_isBusy) return;
+
                       setState(() {
                         final card = _cards[index];
                         if (card.state == CardState.unflipped) {
@@ -124,11 +172,13 @@ class _MyHomePageState extends State<MyHomePage> {
                               selectedCard = null;
                               _checkGameFinished();
                             } else {
-                              Future.delayed(const Duration(seconds: 2), () {
+                              _isBusy = true;
+                              Future.delayed(const Duration(seconds: 1), () {
                                 setState(() {
                                   selectedCard!.setStateTo(CardState.unflipped);
                                   card.setStateTo(CardState.unflipped);
                                   selectedCard = null;
+                                  _isBusy = false;
                                 });
                               });
                             }
@@ -157,6 +207,31 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                   );
                 }),
+              ),
+            ),
+            Center(
+              child: TextButton(
+                onPressed: () {
+                  setState(() {
+                    // Reset card states and shuffle
+                    for (var card in _cards) {
+                      card.setStateTo(CardState.unflipped);
+                    }
+                    _cards.shuffle();
+
+                    // Reset selected card and time
+                    selectedCard = null;
+                    _time = 0;
+
+                    // Cancel old timer and start new one
+                    _timer?.cancel();
+                    _startTimer();
+
+                    // Load existing best time again (in case it was beaten)
+                    _loadBestTime();
+                  });
+                },
+                child: const Text('Play Again', style: TextStyle(fontSize: 16)),
               ),
             ),
           ],

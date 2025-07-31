@@ -8,7 +8,9 @@ class CardItem {
   Color color;
   CardState state;
   String get displayLabel =>
-      state == CardState.flipped ? flippedLabel : unflippedLabel;
+      state == CardState.flipped || state == CardState.matched
+          ? flippedLabel
+          : unflippedLabel;
 
   CardItem({
     required this.flippedLabel,
@@ -24,10 +26,10 @@ class CardItem {
         color = Colors.grey;
         break;
       case CardState.flipped:
-        color = Colors.lightBlue[200]!;
+        color = Colors.lightBlue[100]!;
         break;
       case CardState.matched:
-        color = Colors.green;
+        color = Colors.lightGreen[300]!;
         break;
     }
   }
