@@ -234,100 +234,105 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Level: $difficultyLabel')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            if (_bestEntry != null)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Best score: ${_bestEntry!.score}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: _isNewRecord ? Colors.green : Colors.black,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              if (_bestEntry != null)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Best score: ${_bestEntry!.score}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: _isNewRecord ? Colors.green : Colors.black,
+                        ),
                       ),
-                    ),
-                    Text(
-                      '⏱️ ${_bestEntry!.time}s   🔁 ${_bestEntry!.moves} moves',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
+                      Text(
+                        '⏱️ ${_bestEntry!.time}s   🔁 ${_bestEntry!.moves} moves',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black54,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 20),
+              Text(
+                'Time: $_time seconds',
+                style: const TextStyle(fontSize: 20),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    int crossAxisCount = switch (widget.difficulty) {
+                      Difficulty.easy => 3,
+                      Difficulty.medium => 3,
+                      Difficulty.hard => 4,
+                    };
+
+                    final totalCards = switch (widget.difficulty) {
+                      Difficulty.easy => 8,
+                      Difficulty.medium => 12,
+                      Difficulty.hard => 16,
+                    };
+
+                    final rowCount = (totalCards / crossAxisCount).ceil();
+                    final spacing = 8.0 * (rowCount - 1);
+                    final availableHeight = constraints.maxHeight - spacing;
+                    final childHeight = availableHeight / rowCount;
+                    final childWidth = constraints.maxWidth / crossAxisCount;
+
+                    final aspectRatio = childWidth / childHeight;
+
+                    return GridView.count(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      childAspectRatio: aspectRatio,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: List.generate(_cards.length, (index) {
+                        final card = _cards[index];
+                        return FlipCard(
+                          isFlipped: card.state != CardState.unflipped,
+                          onTap: () => _handleCardTap(card),
+                          front: _buildFrontCard(),
+                          back: _buildBackCard(card),
+                        );
+                      }),
+                    );
+                  },
                 ),
               ),
-            const SizedBox(height: 20),
-            Text('Time: $_time seconds', style: const TextStyle(fontSize: 20)),
-            const SizedBox(height: 12),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  int crossAxisCount = switch (widget.difficulty) {
-                    Difficulty.easy => 3,
-                    Difficulty.medium => 3,
-                    Difficulty.hard => 4,
-                  };
 
-                  final totalCards = switch (widget.difficulty) {
-                    Difficulty.easy => 8,
-                    Difficulty.medium => 12,
-                    Difficulty.hard => 16,
-                  };
-
-                  final rowCount = (totalCards / crossAxisCount).ceil();
-                  final spacing = 8.0 * (rowCount - 1);
-                  final availableHeight = constraints.maxHeight - spacing;
-                  final childHeight = availableHeight / rowCount;
-                  final childWidth = constraints.maxWidth / crossAxisCount;
-
-                  final aspectRatio = childWidth / childHeight;
-
-                  return GridView.count(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                    childAspectRatio: aspectRatio,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: List.generate(_cards.length, (index) {
-                      final card = _cards[index];
-                      return FlipCard(
-                        isFlipped: card.state != CardState.unflipped,
-                        onTap: () => _handleCardTap(card),
-                        front: _buildFrontCard(),
-                        back: _buildBackCard(card),
-                      );
-                    }),
-                  );
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    for (var card in _cards) {
+                      card.state = CardState.unflipped;
+                    }
+                    _cards.shuffle();
+                    selectedCard = null;
+                    _time = 0;
+                    _moves = 0;
+                    _isBusy = false;
+                    _isNewRecord = false;
+                    _timer?.cancel();
+                    _startTimer();
+                    _loadBestEntry();
+                  });
                 },
+                child: const Text('Play Again'),
               ),
-            ),
-
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  for (var card in _cards) {
-                    card.state = CardState.unflipped;
-                  }
-                  _cards.shuffle();
-                  selectedCard = null;
-                  _time = 0;
-                  _moves = 0;
-                  _isBusy = false;
-                  _isNewRecord = false;
-                  _timer?.cancel();
-                  _startTimer();
-                  _loadBestEntry();
-                });
-              },
-              child: const Text('Play Again'),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
