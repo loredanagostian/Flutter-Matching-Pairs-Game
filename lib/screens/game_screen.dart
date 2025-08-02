@@ -21,7 +21,8 @@ class _GameScreenState extends State<GameScreen> {
   List<CardItem> _cards = [];
   CardItem? selectedCard;
   bool _isBusy = false;
-  int? _bestTime;
+  int? _bestScore;
+  int _moves = 0;
 
   int get cardCount {
     switch (widget.difficulty) {
@@ -34,7 +35,7 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
-  String get prefsKey => 'bestTime_${widget.difficulty.name}';
+  String get prefsKey => 'bestScore_${widget.difficulty.name}';
 
   String get difficultyLabel => switch (widget.difficulty) {
     Difficulty.easy => 'Easy',
@@ -75,7 +76,7 @@ class _GameScreenState extends State<GameScreen> {
       await prefs.setInt(prefsKey, -1);
     }
     setState(() {
-      _bestTime = prefs.getInt(prefsKey);
+      _bestScore = prefs.getInt(prefsKey);
     });
   }
 
@@ -85,21 +86,66 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
+  double getDifficultyMultiplier(Difficulty difficulty) {
+    switch (difficulty) {
+      case Difficulty.easy:
+        return 1.0;
+      case Difficulty.medium:
+        return 1.5;
+      case Difficulty.hard:
+        return 2.0;
+    }
+  }
+
   void _checkGameFinished() async {
     final allMatched = _cards.every((card) => card.state == CardState.matched);
-    if (allMatched) {
-      _timer?.cancel();
+    if (!allMatched) return;
 
-      final prefs = await SharedPreferences.getInstance();
-      final savedBestTime = prefs.getInt(prefsKey);
+    _timer?.cancel();
 
-      if (savedBestTime == null ||
-          savedBestTime == -1 ||
-          _time < savedBestTime) {
-        if (_time > 0) {
-          await prefs.setInt(prefsKey, _time);
-          setState(() => _bestTime = _time);
-        }
+    const baseScore = 1000;
+    const timePenalty = 2; // 2 points lost per second
+    const movePenalty = 3; // 3 points lost per move
+
+    double difficultyMultiplier = getDifficultyMultiplier(widget.difficulty);
+    int rawScore = baseScore - (_time * timePenalty) - (_moves * movePenalty);
+    rawScore = rawScore < 0 ? 0 : rawScore;
+    int finalScore = (rawScore * difficultyMultiplier).round();
+
+    // Show score
+    //
+    // Example:
+    // Difficulty: Medium
+    // Time: 40 seconds
+    // Moves: 30
+    //
+    // Score = 1000 - (40 * 2) - (30 * 3) = 1000 - 80 - 90 = 830
+    // Final Score = 830 * 1.5 = 1245
+    showDialog(
+      context: context,
+      builder:
+          (_) => AlertDialog(
+            title: const Text('Game Completed!'),
+            content: Text(
+              'Your score: $finalScore\n'
+              'Time: $_time sec\nMoves: $_moves',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    final savedBestScore = prefs.getInt(prefsKey);
+
+    if (savedBestScore == null || finalScore < savedBestScore) {
+      if (_time > 0) {
+        await prefs.setInt(prefsKey, finalScore);
+        setState(() => _bestScore = finalScore);
       }
     }
   }
@@ -109,7 +155,9 @@ class _GameScreenState extends State<GameScreen> {
 
     setState(() {
       if (card.state == CardState.unflipped) {
+        _moves++;
         card.state = CardState.flipped;
+
         if (selectedCard == null) {
           selectedCard = card;
         } else {
@@ -121,6 +169,7 @@ class _GameScreenState extends State<GameScreen> {
             _checkGameFinished();
           } else {
             _isBusy = true;
+
             Future.delayed(const Duration(seconds: 0, milliseconds: 500), () {
               setState(() {
                 selectedCard!.state = CardState.unflipped;
@@ -171,10 +220,10 @@ class _GameScreenState extends State<GameScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            if (_bestTime != null && _bestTime! > 0)
+            if (_bestScore != null && _bestScore! > 0)
               Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Best time: $_bestTime seconds'),
+                child: Text('Best score: $_bestScore'),
               ),
             const SizedBox(height: 20),
             Text('Time: $_time seconds', style: const TextStyle(fontSize: 20)),

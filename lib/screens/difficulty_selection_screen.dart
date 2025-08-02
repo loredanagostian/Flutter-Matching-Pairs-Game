@@ -13,7 +13,7 @@ class DifficultySelectionScreen extends StatefulWidget {
 
 class _DifficultySelectionScreenState extends State<DifficultySelectionScreen>
     with RouteAware {
-  Map<Difficulty, int?> bestTimes = {
+  Map<Difficulty, int?> bestScores = {
     Difficulty.easy: null,
     Difficulty.medium: null,
     Difficulty.hard: null,
@@ -34,16 +34,16 @@ class _DifficultySelectionScreenState extends State<DifficultySelectionScreen>
 
   @override
   void didPopNext() {
-    _loadBestTimes(); // refresh when user comes back
+    _loadBestTimes();
   }
 
   Future<void> _loadBestTimes() async {
     final prefs = await SharedPreferences.getInstance();
 
     setState(() {
-      bestTimes[Difficulty.easy] = prefs.getInt('bestTime_easy');
-      bestTimes[Difficulty.medium] = prefs.getInt('bestTime_medium');
-      bestTimes[Difficulty.hard] = prefs.getInt('bestTime_hard');
+      bestScores[Difficulty.easy] = prefs.getInt('bestScore_easy');
+      bestScores[Difficulty.medium] = prefs.getInt('bestScore_medium');
+      bestScores[Difficulty.hard] = prefs.getInt('bestScore_hard');
     });
   }
 
@@ -59,13 +59,6 @@ class _DifficultySelectionScreenState extends State<DifficultySelectionScreen>
         Navigator.pushNamed(context, '/hard');
         break;
     }
-  }
-
-  String _formatTime(int? timeInSeconds) {
-    if (timeInSeconds == null) return 'No record';
-    final minutes = (timeInSeconds ~/ 60).toString().padLeft(2, '0');
-    final seconds = (timeInSeconds % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
   }
 
   Widget _buildButton(Difficulty difficulty, Color color) {
@@ -85,7 +78,7 @@ class _DifficultySelectionScreenState extends State<DifficultySelectionScreen>
         ),
         const SizedBox(height: 4),
         Text(
-          'Best time: ${_formatTime(bestTimes[difficulty])}',
+          'Best score: ${bestScores[difficulty] ?? "Not recorded"}',
           style: const TextStyle(fontSize: 14, color: Colors.black54),
         ),
         const SizedBox(height: 50),
