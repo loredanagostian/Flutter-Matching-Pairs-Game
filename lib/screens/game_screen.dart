@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:matching_pairs_game/models/card_item.dart';
+import 'package:matching_pairs_game/models/score_entry.dart';
 import 'package:matching_pairs_game/widgets/flip_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:matching_pairs_game/constants/enums.dart';
@@ -21,7 +23,8 @@ class _GameScreenState extends State<GameScreen> {
   List<CardItem> _cards = [];
   CardItem? selectedCard;
   bool _isBusy = false;
-  int? _bestScore;
+  ScoreEntry? _bestEntry;
+  bool _isNewRecord = false;
   int _moves = 0;
 
   int get cardCount {
@@ -35,7 +38,7 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
-  String get prefsKey => 'bestScore_${widget.difficulty.name}';
+  String get prefsKey => 'bestEntry_${widget.difficulty.name}';
 
   String get difficultyLabel => switch (widget.difficulty) {
     Difficulty.easy => 'Easy',
@@ -47,7 +50,7 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
     _generateCards();
-    _loadBestTime();
+    _loadBestEntry();
     _startTimer();
   }
 
@@ -69,15 +72,15 @@ class _GameScreenState extends State<GameScreen> {
     _cards.shuffle();
   }
 
-  Future<void> _loadBestTime() async {
+  Future<void> _loadBestEntry() async {
     final prefs = await SharedPreferences.getInstance();
-    final storedTime = prefs.getInt(prefsKey);
-    if (storedTime == 0) {
-      await prefs.setInt(prefsKey, -1);
+    final jsonStr = prefs.getString(prefsKey);
+    if (jsonStr != null) {
+      final entry = ScoreEntry.fromJson(jsonDecode(jsonStr));
+      setState(() {
+        _bestEntry = entry;
+      });
     }
-    setState(() {
-      _bestScore = prefs.getInt(prefsKey);
-    });
   }
 
   void _startTimer() {
@@ -140,14 +143,29 @@ class _GameScreenState extends State<GameScreen> {
     );
 
     final prefs = await SharedPreferences.getInstance();
-    final savedBestScore = prefs.getInt(prefsKey);
+    final existingJson = prefs.getString(prefsKey);
+    ScoreEntry? existingEntry;
 
-    if (savedBestScore == null || finalScore < savedBestScore) {
-      if (_time > 0) {
-        await prefs.setInt(prefsKey, finalScore);
-        setState(() => _bestScore = finalScore);
-      }
+    if (existingJson != null) {
+      existingEntry = ScoreEntry.fromJson(jsonDecode(existingJson));
     }
+
+    final newEntry = ScoreEntry(score: finalScore, time: _time, moves: _moves);
+
+    bool isNewRecord =
+        existingEntry == null || finalScore > existingEntry.score;
+
+    if (isNewRecord) {
+      await prefs.setString(prefsKey, jsonEncode(newEntry.toJson()));
+    }
+
+    setState(() {
+      if (isNewRecord) {
+        _bestEntry = newEntry;
+      }
+
+      _isNewRecord = isNewRecord;
+    });
   }
 
   void _handleCardTap(CardItem card) {
@@ -220,10 +238,29 @@ class _GameScreenState extends State<GameScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            if (_bestScore != null && _bestScore! > 0)
+            if (_bestEntry != null)
               Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Best score: $_bestScore'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Best score: ${_bestEntry!.score}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _isNewRecord ? Colors.green : Colors.black,
+                      ),
+                    ),
+                    Text(
+                      '⏱️ ${_bestEntry!.time}s   🔁 ${_bestEntry!.moves} moves',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             const SizedBox(height: 20),
             Text('Time: $_time seconds', style: const TextStyle(fontSize: 20)),
@@ -256,8 +293,7 @@ class _GameScreenState extends State<GameScreen> {
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                     childAspectRatio: aspectRatio,
-                    physics:
-                        const NeverScrollableScrollPhysics(), // disable scroll
+                    physics: const NeverScrollableScrollPhysics(),
                     children: List.generate(_cards.length, (index) {
                       final card = _cards[index];
                       return FlipCard(
@@ -281,9 +317,12 @@ class _GameScreenState extends State<GameScreen> {
                   _cards.shuffle();
                   selectedCard = null;
                   _time = 0;
+                  _moves = 0;
+                  _isBusy = false;
+                  _isNewRecord = false;
                   _timer?.cancel();
                   _startTimer();
-                  _loadBestTime();
+                  _loadBestEntry();
                 });
               },
               child: const Text('Play Again'),

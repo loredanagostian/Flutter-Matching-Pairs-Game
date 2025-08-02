@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:matching_pairs_game/constants/observers.dart';
 import 'package:matching_pairs_game/screens/difficulty_selection_screen.dart';
 import 'package:matching_pairs_game/screens/game_screen.dart';
 import 'package:matching_pairs_game/constants/enums.dart';
 
-void main() {
+void main() async {
+  // Lock to portrait up only
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
   runApp(const MyApp());
 }
 
